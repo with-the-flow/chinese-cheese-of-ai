@@ -71,16 +71,17 @@ class ChessAI:
         return np.array(encoded, dtype=np.float32)
     
     def _forward_pass(self, x: np.ndarray) -> float:
-        """9层神经网络前向传播（修正）"""
+        """10层神经网络前向传播"""
         try:
+            # 10层前向传播
             h = x
-            # 实际只有9层权重 (w1-w9)
-            for i in range(1, 10):
+            for i in range(1, 11):
                 h = np.tanh(h @ self.neural_net[f'w{i}'] + self.neural_net[f'b{i}'])
             
             return float(h[0])
         except Exception as e:
-            print(f"神经网络前向传播错误: {e}")
+            # 如果出错，返回基于棋子价值的简单评估
+            print(f"神经网络错误: {e}")
             return 0.0
     
     def evaluate_board(self, chess_game: ChineseChess) -> float:

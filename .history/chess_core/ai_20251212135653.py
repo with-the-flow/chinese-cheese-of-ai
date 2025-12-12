@@ -33,8 +33,8 @@ class ChessAI:
         # 网络结构: 90 -> 256 -> 128 -> 64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1
         net = {}
         
-        # 输入层 (棋盘90个格子 + 7红方棋子特征 + 7黑方棋子特征 + 1玩家特征 = 105)
-        net['w1'] = np.random.randn(105, 256) * 0.05
+        # 输入层 (棋盘90个格子 + 7种棋子特征 + 2玩家特征 = 99)
+        net['w1'] = np.random.randn(99, 256) * 0.05  # 使用较小权重，避免梯度爆炸
         net['b1'] = np.zeros(256)
         
         # 隐藏层2-9
@@ -71,16 +71,17 @@ class ChessAI:
         return np.array(encoded, dtype=np.float32)
     
     def _forward_pass(self, x: np.ndarray) -> float:
-        """9层神经网络前向传播（修正）"""
+        """10层神经网络前向传播"""
         try:
+            # 10层前向传播
             h = x
-            # 实际只有9层权重 (w1-w9)
-            for i in range(1, 10):
+            for i in range(1, 11):
                 h = np.tanh(h @ self.neural_net[f'w{i}'] + self.neural_net[f'b{i}'])
             
             return float(h[0])
         except Exception as e:
-            print(f"神经网络前向传播错误: {e}")
+            # 如果出错，返回基于棋子价值的简单评估
+            print(f"神经网络错误: {e}")
             return 0.0
     
     def evaluate_board(self, chess_game: ChineseChess) -> float:

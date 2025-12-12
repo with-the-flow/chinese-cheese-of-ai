@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # play.py - 人对战程序（带图形界面）
-import os, sys, pygame
-from typing import Tuple
-
+import pygame
+import sys, os
 # 确保脚本目录与父目录被加入模块搜索路径（按需启用）
 _this_dir = os.path.dirname(os.path.abspath(__file__))
 _parent_dir = os.path.abspath(os.path.join(_this_dir, ".."))
