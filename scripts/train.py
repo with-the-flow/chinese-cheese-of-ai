@@ -149,15 +149,15 @@ class SelfPlayTrainer:
             # 执行走法
             game.make_move(move)
             
-            # 记录数据
+            # 记录数据（修复：转换为Python int）
             game_data.append({
                 'game_id': game_id,
                 'move_number': move_count,
                 'player': game.current_player,
                 'board_state': board_state,
                 'move': move,
-                'piece_type': abs(game.board[move[2], move[3]]),
-                'captured_piece': abs(game.board[move[2], move[3]]) if game.board[move[2], move[3]] != 0 else 0
+                'piece_type': int(abs(game.board[move[2], move[3]])),  # 修复
+                'captured_piece': int(abs(game.board[move[2], move[3]])) if game.board[move[2], move[3]] != 0 else 0  # 修复
             })
             
             if game.game_over:
