@@ -1,69 +1,94 @@
-name: Continuous Self-Play Training
+name: Daily Self-Play Training (6h)
 
 on:
-  push:
-    branches: [ main, master ]
+  schedule:
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
   train:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 360
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Create data directory
-      run: mkdir -p data
-    
-    - name: Calculate training duration
-      id: duration
+        pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+    - name: Check previous weights
+      id: check_weights
       run: |
-        CURRENT_HOUR=$(date -u +%H)
-        CURRENT_MIN=$(date -u +%M)
-        TARGET_HOUR=21
-        TARGET_MIN=55
-        CURRENT_TOTAL=$((CURRENT_HOUR * 3600 + CURRENT_MIN * 60))
-        TARGET_TOTAL=$((TARGET_HOUR * 3600 + TARGET_MIN * 60))
-        if [ $CURRENT_TOTAL -le $TARGET_TOTAL ]; then
-          SECONDS_UNTIL_STOP=$((TARGET_TOTAL - CURRENT_TOTAL))
+        if [ -f "weights/weights_final.pt" ]; then
+          echo "has_weights=true" >> $GITHUB_OUTPUT
+          echo "Found existing weights"
         else
-          SECONDS_UNTIL_STOP=$((86400 - CURRENT_TOTAL + TARGET_TOTAL))
+          echo "has_weights=false" >> $GITHUB_OUTPUT
+          echo "No previous weights"
         fi
-        echo "seconds_until_stop=$SECONDS_UNTIL_STOP" >> $GITHUB_OUTPUT
-    
-    - name: Run continuous training
+
+    - name: Create directories
+      run: mkdir -p data weights
+
+    - name: Run training (6 hours max)
       env:
         PYTHONUNBUFFERED: 1
-        TRAINING_DURATION: ${{ steps.duration.outputs.seconds_until_stop }}
       run: |
-        python scripts/train.py --duration $TRAINING_DURATION
-    
-    - name: Upload training data
+        set +e  # 不自动退出，手动处理错误码
+        
+        if [ "${{ steps.check_weights.outputs.has_weights }}" == "true" ]; then
+          timeout 21540 python scripts/train.py \
+            --max-games 100000 \
+            --load-weights weights/weights_final.pt \
+            --device cpu \
+            --log-file train_data.log
+        else
+          timeout 21540 python scripts/train.py \
+            --max-games 100000 \
+            --device cpu \
+            --log-file train_data.log
+        fi
+        
+        EXIT_CODE=$?
+        set -e
+        
+        if [ $EXIT_CODE -eq 124 ]; then
+          echo "Training stopped after ~6 hours (timeout) - expected"
+        elif [ $EXIT_CODE -eq 0 ]; then
+          echo "Training completed normally"
+        else
+          echo "Training failed with exit code: $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+
+    - name: Upload artifacts
       if: always()
-      uses: actions/upload-artifact@v4  # 关键修复
+      uses: actions/upload-artifact@v4
       with:
-        name: training-data-${{ github.run_number }}-${{ github.run_attempt }}
+        name: training-backup-${{ github.run_number }}-${{ github.run_attempt }}
         path: |
-          data/
-          !data/*.log
-        retention-days: 30
-    
-    - name: Commit updated stats
+          train_data.log
+          weights/weights_final.pt
+        retention-days: 7
+
+    - name: Commit results
       if: always()
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add data/stats.json data/ai_stats.json || true
-        git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update training stats"
-        git push || echo "No changes to push"
+        git add train_data.log weights/weights_final.pt || true
+        
+        if ! git diff --cached --quiet; then
+          git commit -m "Auto-update: training log & weights [run ${{ github.run_number }}]"
+          git push || echo "Push failed"
+        else
+          echo "No changes"
+        fi
