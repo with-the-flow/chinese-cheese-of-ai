@@ -1,14 +1,14 @@
-name: Daily Self-Play Training (6h)
+name: Daily Self-Play Training (100 games)
 
 on:
   schedule:
-    - cron: '0 18 * * *'
+    - cron: '0 18 * * *'   # UTC 18:00 = 北京时间 02:00
   workflow_dispatch:
 
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 360   # 100局很快，360分钟足够
 
     steps:
     - name: Checkout code
@@ -38,21 +38,21 @@ jobs:
     - name: Create directories
       run: mkdir -p data weights
 
-    - name: Run training (6 hours max)
+    - name: Run training (100 games)
       env:
         PYTHONUNBUFFERED: 1
       run: |
-        set +e  # 不自动退出，手动处理错误码
+        set +e
         
         if [ "${{ steps.check_weights.outputs.has_weights }}" == "true" ]; then
-          timeout 21540 python scripts/train.py \
-            --max-games 100000 \
+          python scripts/train.py \
+            --max-games 100 \
             --load-weights weights/weights_final.pt \
             --device cpu \
             --log-file train_data.log
         else
-          timeout 21540 python scripts/train.py \
-            --max-games 100000 \
+          python scripts/train.py \
+            --max-games 100 \
             --device cpu \
             --log-file train_data.log
         fi
@@ -60,9 +60,7 @@ jobs:
         EXIT_CODE=$?
         set -e
         
-        if [ $EXIT_CODE -eq 124 ]; then
-          echo "Training stopped after ~6 hours (timeout) - expected"
-        elif [ $EXIT_CODE -eq 0 ]; then
+        if [ $EXIT_CODE -eq 0 ]; then
           echo "Training completed normally"
         else
           echo "Training failed with exit code: $EXIT_CODE"
