@@ -1,4 +1,4 @@
-name: Daily Self-Play Training (100 games)
+name: Daily Self-Play Training (1000 games)
 
 on:
   schedule:
@@ -8,7 +8,7 @@ on:
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # 100局很快，360分钟足够
+    timeout-minutes: 360   # 1000局很快，360分钟足够
 
     steps:
     - name: Checkout code
@@ -38,7 +38,7 @@ jobs:
     - name: Create directories
       run: mkdir -p data weights
 
-    - name: Run training (100 games)
+    - name: Run training (1000 games)
       env:
         PYTHONUNBUFFERED: 1
       run: |
@@ -46,13 +46,13 @@ jobs:
         
         if [ "${{ steps.check_weights.outputs.has_weights }}" == "true" ]; then
           python scripts/train.py \
-            --max-games 100 \
+            --max-games 1000 \
             --load-weights weights/weights_final.pt \
             --device cpu \
             --log-file train_data.log
         else
           python scripts/train.py \
-            --max-games 100 \
+            --max-games 1000 \
             --device cpu \
             --log-file train_data.log
         fi
